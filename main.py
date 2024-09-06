@@ -1,35 +1,31 @@
 import cv2
 from hand_tracking import HandTracker
+from head_tracking import HeadTracker
 
 
 def main():
-    # Initialize HandTracker
+    # Initialize trackers
     hand_tracker = HandTracker()
+    head_tracker = HeadTracker()
 
     # Start video capture (webcam)
     cap = cv2.VideoCapture(0)
 
     while True:
-        # Read frame from webcam
         ret, frame = cap.read()
         if not ret:
             print("Failed to grab frame.")
             break
 
-        # Detect hands and landmarks
-        hands, img = hand_tracker.detect_hands(frame)
+        # Process hand tracking
+        hands, frame_with_hands = hand_tracker.detect_hands(frame)
+        hand_tracker.send_commands(hands)
 
-        # Count raised fingers
-        current_fingers_up = hand_tracker.count_fingers(hands)
+        # Process head tracking
+        frame_with_head_tracking = head_tracker.process_frame(frame_with_hands)
 
-        # Smooth the finger count
-        smoothed_fingers_up = hand_tracker.smooth_fingers_count(current_fingers_up)
-
-        # Send corresponding keyboard command
-        hand_tracker.send_keyboard_command(smoothed_fingers_up)
-
-        # Display the frame with hand landmarks
-        cv2.imshow('Hand Tracking', img)
+        # Display the frame with both hand and head tracking
+        cv2.imshow('Hand and Head Tracking', frame_with_head_tracking)
 
         # Exit if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):

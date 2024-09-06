@@ -1,67 +1,36 @@
 import cv2
 from cvzone.HandTrackingModule import HandDetector
 from pynput.keyboard import Controller as KeyboardController
-import numpy as np
+from time import time, sleep
 
 
 class HandTracker:
-    def __init__(self, smoothing_factor=0.8):
-        # Initialize the HandDetector with specific parameters
-        self.detector = HandDetector(maxHands=1, detectionCon=0.8)
+    def __init__(self, key_hold_duration=0.5):
+        self.hand_detector = HandDetector()
         self.keyboard = KeyboardController()
-        self.smoothing_factor = smoothing_factor
-        self.previous_fingers_up = 0
+        self.key_hold_duration = key_hold_duration
+        self.key_press_times = {}  # Track when keys were last pressed
 
     def detect_hands(self, frame):
-        # Detect hands and landmarks in the frame
-        hands, img = self.detector.findHands(frame)
-        if hands:
-            for hand in hands:
-                landmarks = hand['lmList']
-                # Draw landmarks for debugging
-                for lm in landmarks:
-                    x, y = lm[0], lm[1]
-                    cv2.circle(img, (x, y), 5, (0, 255, 0), cv2.FILLED)
-                print("Landmarks:", landmarks)
+        hands, img = self.hand_detector.findHands(frame, draw=True)
         return hands, img
 
-    def count_fingers(self, hands):
+    def send_commands(self, hands):
         if hands:
-            hand = hands[0]
-            landmarks = hand['lmList']
+            hand = hands[0]  # Use the first detected hand
+            fingers_up = self.count_fingers(hand)
+            command = self.get_wasd_command(fingers_up)
+            self.manage_keyboard(command)
+        else:
+            # Release all keys if no hands are detected
+            self.release_all_keys()
 
-            # Initialize the number of fingers up
-            fingers_up = 0
-
-            # Thumb (special case)
-            thumb_tip_y = landmarks[4][1]
-            thumb_ip_y = landmarks[3][1]
-            thumb_mcp_y = landmarks[2][1]
-            if thumb_tip_y < thumb_ip_y and thumb_ip_y < thumb_mcp_y:
-                fingers_up += 1
-
-            # Fingers: Index, Middle, Ring, Pinky
-            for i, base in zip([8, 12, 16, 20], [6, 10, 14, 18]):
-                tip_y = landmarks[i][1]
-                base_y = landmarks[base][1]
-                if tip_y < base_y:
-                    fingers_up += 1
-
-            # Ensure not to count more than 5 fingers
-            fingers_up = min(fingers_up, 5)
-
-            return fingers_up
-        return 0
-
-    def smooth_fingers_count(self, current_fingers_up):
-        # Smooth the transition between finger counts
-        smoothed_fingers_up = int(
-            self.smoothing_factor * current_fingers_up + (1 - self.smoothing_factor) * self.previous_fingers_up)
-        self.previous_fingers_up = smoothed_fingers_up
-        return smoothed_fingers_up
+    def count_fingers(self, hand_landmarks):
+        fingers_up = 0
+        # Implement the logic to count fingers based on landmarks
+        return fingers_up
 
     def get_wasd_command(self, fingers_up):
-        # Map the number of fingers to WASD keys
         commands = {
             1: "w",  # Forward
             2: "a",  # Left
@@ -70,13 +39,23 @@ class HandTracker:
         }
         return commands.get(fingers_up, None)
 
-    def send_keyboard_command(self, fingers_up):
-        command = self.get_wasd_command(fingers_up)
+    def manage_keyboard(self, command):
+        current_time = time()
         if command:
-            # Send the keyboard command
-            self.keyboard.press(command)
-            self.keyboard.release(command)
-            print(f"Sent keyboard command: {command}")
+            # Press the key if it's not already being pressed or if the hold duration has passed
+            if command not in self.key_press_times or (
+                    current_time - self.key_press_times[command] > self.key_hold_duration):
+                self.keyboard.press(command)
+                self.key_press_times[command] = current_time
+                print(f"Holding key: {command}")
         else:
-            print("No command mapped for this number of fingers.")
+            # Release all keys if no valid command
+            self.release_all_keys()
+
+    def release_all_keys(self):
+        # Release all currently pressed keys
+        for key in self.key_press_times.keys():
+            self.keyboard.release(key)
+        self.key_press_times.clear()
+        print("Released all keys")
 
