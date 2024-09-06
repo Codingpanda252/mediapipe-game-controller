@@ -4,6 +4,7 @@ from hand_tracking import HandTracker
 from head_tracking import HeadTracker
 from game_controller import GameController
 
+
 def main():
     # Initialize objects
     hand_tracker = HandTracker()
@@ -29,6 +30,9 @@ def main():
         # Head tracking for camera rotation
         face_result = head_tracker.detect_head(frame)
         if face_result.multi_face_landmarks:
+            # Draw face mesh
+            head_tracker.draw_face_mesh(frame, face_result.multi_face_landmarks)
+
             for face_landmarks in face_result.multi_face_landmarks:
                 rotation_x, rotation_y = head_tracker.get_head_rotation(face_landmarks)
                 game_controller.send_mouse_movement(rotation_x, rotation_y)
@@ -40,6 +44,7 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
