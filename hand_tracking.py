@@ -1,33 +1,60 @@
-# hand_tracking.py
 import cv2
-import mediapipe as mp
+from cvzone.HandTrackingModule import HandDetector
+from pynput.keyboard import Controller as KeyboardController
+
 
 class HandTracker:
     def __init__(self):
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands()
-        self.mp_draw = mp.solutions.drawing_utils
+        # Initialize the HandDetector with specific parameters
+        self.detector = HandDetector(maxHands=1, detectionCon=0.8)
+        self.keyboard = KeyboardController()
 
     def detect_hands(self, frame):
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        result = self.hands.process(rgb_frame)
-        if result.multi_hand_landmarks:
-            for hand_landmarks in result.multi_hand_landmarks:
-                self.mp_draw.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
-        return result
+        # Detect hands and landmarks in the frame
+        hands, img = self.detector.findHands(frame)
+        return hands, img
 
-    def count_fingers(self, hand_landmarks):
-        # Custom logic to count raised fingers and map to WASD commands
-        fingers_up = 0
-        # Example: Implement logic for thumb, index, middle, ring, pinky
-        return fingers_up
+    def count_fingers(self, hands):
+        if hands:
+            hand = hands[0]
+            landmarks = hand['lmList']
+
+            # Initialize the number of fingers up
+            fingers_up = 0
+
+            # Thumb (special case)
+            thumb_tip_y = landmarks[4][1]
+            thumb_ip_y = landmarks[3][1]
+            if thumb_tip_y < thumb_ip_y:
+                fingers_up += 1
+
+            # Fingers: Index, Middle, Ring, Pinky
+            for i in [8, 12, 16, 20]:
+                tip_y = landmarks[i][1]
+                mcp_y = landmarks[i - 2][1]
+                if tip_y < mcp_y:
+                    fingers_up += 1
+
+            print(f"Counted fingers up: {fingers_up}")
+            return fingers_up
+        return 0
 
     def get_wasd_command(self, fingers_up):
         # Map the number of fingers to WASD keys
         commands = {
-            1: "W",  # Forward
-            2: "A",  # Left
-            3: "S",  # Backward
-            4: "D"   # Right
+            1: "w",  # Forward
+            2: "a",  # Left
+            3: "s",  # Backward
+            4: "d"  # Right
         }
         return commands.get(fingers_up, None)
+
+    def send_keyboard_command(self, fingers_up):
+        command = self.get_wasd_command(fingers_up)
+        if command:
+            # Send the keyboard command
+            self.keyboard.press(command)
+            self.keyboard.release(command)
+            print(f"Sent keyboard command: {command}")
+        else:
+            print("No command mapped for this number of fingers.")
