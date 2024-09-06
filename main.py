@@ -19,9 +19,14 @@ def main():
         # Detect hands and landmarks
         hands, img = hand_tracker.detect_hands(frame)
 
-        # Count raised fingers and send corresponding keyboard command
-        fingers_up = hand_tracker.count_fingers(hands)
-        hand_tracker.send_keyboard_command(fingers_up)
+        # Count raised fingers
+        current_fingers_up = hand_tracker.count_fingers(hands)
+
+        # Smooth the finger count
+        smoothed_fingers_up = hand_tracker.smooth_fingers_count(current_fingers_up)
+
+        # Send corresponding keyboard command
+        hand_tracker.send_keyboard_command(smoothed_fingers_up)
 
         # Display the frame with hand landmarks
         cv2.imshow('Hand Tracking', img)
